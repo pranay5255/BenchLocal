@@ -1,8 +1,9 @@
-import { useCallback, useEffect, useId, useMemo, useRef, useState, type ReactNode } from "react";
+import { lazy, Suspense, useCallback, useEffect, useId, useMemo, useRef, useState, type ReactNode } from "react";
 import benchlocalIcon from "../../../assets/benchlocal-icon.png";
 import benchlocalIconOutline from "../../../assets/benchlocal-icon-outline.png";
 import shareCardDisplayFontUrl from "./assets/fonts/InterVariable.woff2";
 import shareCardMonoFontUrl from "./assets/fonts/JetBrainsMonoVariable.woff2";
+import type { ShareResultsData } from "./features/share-results/share-results";
 import {
   ArrowRight,
   ArrowUp,
@@ -75,6 +76,11 @@ import type {
 
 const DETACHED_LOGS_VIEW =
   typeof window !== "undefined" && new URLSearchParams(window.location.search).get("view") === "logs";
+
+const ShareResultsStudio = lazy(async () => {
+  const module = await import("./features/share-results/ShareResultsStudio");
+  return { default: module.ShareResultsStudio };
+});
 
 function describeAppUpdateState(state: BenchLocalUpdateState | null): string {
   if (!state) {
@@ -7590,6 +7596,7 @@ function BenchmarkSection({
   const [sortByScore, setSortByScore] = useState(false);
   const [inspectorOpen, setInspectorOpen] = useState(false);
   const [shareCardData, setShareCardData] = useState<ResultShareCardData | null>(null);
+  const [shareResultsData, setShareResultsData] = useState<ShareResultsData | null>(null);
   const runModeRef = useRef<HTMLDivElement | null>(null);
   const runsPerTestRef = useRef<HTMLDivElement | null>(null);
   const tableScrollViewportRef = useRef<HTMLDivElement | null>(null);
@@ -7638,6 +7645,20 @@ function BenchmarkSection({
     : hasRetryActivity || isStopping || !(canReplayRun || canResumeRun || (!isViewingHistory && canStartFreshRun));
   const hasHorizontalOverflow = tableScrollMetrics.scrollWidth > tableScrollMetrics.clientWidth + 1;
   const stickyColumnShadow = tableScrollMetrics.scrollLeft > 2;
+
+  const openShareResults = async () => {
+    if (!runSummary) {
+      return;
+    }
+
+    const { buildShareResultsData } = await import("./features/share-results/share-results");
+    setShareResultsData(buildShareResultsData({
+      runSummary,
+      models: selectedModels,
+      providers,
+      scenarios
+    }));
+  };
   const scrollbarThumbWidth = hasHorizontalOverflow ? getTableScrollbarThumbWidth(tableScrollMetrics) : 0;
   const scrollbarThumbOffset =
     hasHorizontalOverflow && tableScrollbarTrackRef.current
@@ -8364,7 +8385,17 @@ function BenchmarkSection({
                   <p className="eyebrow">Run Summary</p>
                   <h3 id={`leaderboard-${tabId}`}>Model ranking</h3>
                 </div>
-                <span className="muted-copy">Sorted by total score</span>
+                <div className="leaderboard-header-actions">
+                  <span className="muted-copy">Sorted by total score</span>
+                  <button
+                    type="button"
+                    className="ghost-button ghost-button-compact"
+                    onClick={() => void openShareResults().catch((shareError) => console.error(shareError))}
+                  >
+                    <Share2 size={14} />
+                    Share Run
+                  </button>
+                </div>
               </div>
               <div className="leaderboard-rows">
               {Object.entries(runSummary.scores)
@@ -8483,6 +8514,11 @@ function BenchmarkSection({
         </aside> : null}
       </div>
       {shareCardData ? <ResultShareCardModal data={shareCardData} onClose={() => setShareCardData(null)} /> : null}
+      {shareResultsData ? (
+        <Suspense fallback={null}>
+          <ShareResultsStudio data={shareResultsData} onClose={() => setShareResultsData(null)} />
+        </Suspense>
+      ) : null}
     </section>
   );
 }
