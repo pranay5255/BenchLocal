@@ -346,8 +346,8 @@ async function createMainWindow(): Promise<void> {
     });
   }
 
-  if (process.env.VITE_DEV_SERVER_URL) {
-    await window.loadURL(process.env.VITE_DEV_SERVER_URL);
+  if (process.env.ELECTRON_RENDERER_URL) {
+    await window.loadURL(process.env.ELECTRON_RENDERER_URL);
     if (shouldOpenDevTools) {
       window.webContents.openDevTools({ mode: "detach", activate: true });
     }
